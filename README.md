@@ -1,349 +1,185 @@
-# INTRA OUJDA MODULE: Social Network Project
+# Social Network
 
-## Project Overview
+A Facebook-like social network with a **Go** backend, a **Next.js** frontend, and a **SQLite** database. It has profiles, followers, posts with privacy levels, groups, events, real-time chat, and live notifications. Frontend and backend run in separate **Docker** containers.
 
-This project involves building a Facebook-like social network application using a combination of frontend (JavaScript) and backend (Go) technologies.  The application will feature core social networking functionalities, including user profiles, posts, groups, messaging, and notifications, all while incorporating best practices in software development, such as database migrations and Docker containerization. This README provides a comprehensive guide for understanding and contributing to the project.
+Built as a team project at **Zone01 Oujda**.
 
-## Project Purpose
+---
 
-The primary purpose of this project is to provide a hands-on learning experience in full-stack web development. Students will gain practical skills in:
+## Features
 
-* Frontend development using JavaScript frameworks (Next.js, Vue.js, Svelte, or Mithril are suggested).
-* Backend development using Go, including server setup, database interaction, and API design.
-* Database management using SQLite, including schema design and migrations.
-* Containerization using Docker.
-* Implementing authentication and authorization mechanisms using sessions and cookies.
-* Real-time communication using WebSockets.
+**Accounts and profiles**
+- Register with email, password, first name, last name, and date of birth. Avatar, nickname, and "about me" are optional.
+- Passwords are hashed with **bcrypt**. Sessions are kept with cookies.
+- Profiles can be **public** or **private**, and the user can switch at any time.
+- Each profile shows the user's info, posts, followers, and following.
 
-## Key Features and Implementation Details
+**Followers**
+- Follow and unfollow other users.
+- Following a private profile sends a **follow request** that the owner can accept or reject.
+- Friend suggestions.
 
-This social network will include the following features:
+**Posts and comments**
+- Create posts with an optional image (JPEG, PNG, WebP).
+- Three privacy levels:
+  - **Public**: everyone
+  - **Almost private**: followers only
+  - **Private**: only the followers you choose
+- Comment on posts and like them.
+- Posts load page by page.
 
-**1. User Accounts & Authentication:**
+**Groups and events**
+- Create a group with a title and description.
+- Invite followers, or request to join. The group creator approves requests.
+- Group members can post, comment, and chat inside the group.
+- Create events with a title, description, and date. Members answer **Going** or **Not going**.
 
-*   Registration and login forms requiring email, password, first name, last name, and optional fields (date of birth, avatar, nickname, about me).
-*   Session management using cookies to maintain user login status.
-*   Password hashing using bcrypt for security.
+**Real-time chat**
+- Private messages over **WebSockets**, between users who follow each other or with users who have a public profile.
+- Group chat for every group.
+- Emoji support, message history, and read status.
 
-**2. User Profiles:**
+**Notifications**
+- Live notifications over WebSockets for follow requests, group invitations, join requests, and new events.
+- Notifications are saved, so they're still there after a page reload.
 
-*   Public and private profile options, controlled by the user.
-*   Display of user information (excluding password), activity, posts, followers, and following.
+---
 
-**3. Posts:**
+## Architecture
 
-*   Post creation with optional image/GIF uploads.
-*   Three privacy levels: public, almost private (visible to followers), and private (visible to selected followers).
-*   Commenting functionality.
+```mermaid
+flowchart LR
+    B[Browser] --> F["Next.js frontend<br/>:3000"]
+    F -- "REST /api" --> G["Go backend<br/>:8080"]
+    F -- "WebSocket /api/ws<br/>/api/websocket/ws" --> G
+    G --> D[("SQLite<br/>+ migrations")]
+```
 
-**4. Groups:**
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 15, React 19, CSS Modules, Zod |
+| Backend | Go 1.24, standard `net/http` |
+| Real-time | Gorilla WebSocket |
+| Database | SQLite (`mattn/go-sqlite3`) |
+| Migrations | `golang-migrate` (18 migrations, applied on startup) |
+| Security | bcrypt, UUID session tokens, CORS middleware, rate limiting |
+| Deployment | Docker, Docker Compose |
 
-*   Group creation with title and description.
-*   User invitation and request mechanisms.
-*   Group-specific posts and comments.
-*   Event creation within groups, allowing users to RSVP.
+---
 
-**5. Chat:**
+## Getting started
 
-*   Private messaging between users who are following each other or where the recipient has a public profile.  Real-time updates using WebSockets.
-*   Emoji support.
-*   Group chat functionality.
+### Run with Docker (recommended)
 
-**6. Notifications:**
+```bash
+git clone https://github.com/twlmed212/Social-Network.git
+cd Social-Network
+docker compose up --build
+```
 
-*   Notifications for following requests (private profiles), group invitations, group join requests, and group events.  Notifications will be displayed persistently across all pages.
+- Frontend: **http://localhost:3000**
+- Backend API: **http://localhost:8080**
 
-**7. Followers:**
+### Run locally
 
-*   Follow/unfollow functionality.
-*   Follow requests for private profiles.
+Requirements: Go 1.24+, Node.js 20+, and a C compiler (needed by `go-sqlite3`).
 
-**8. Technology Stack:**
+**Backend**
 
-*   **Frontend:** JavaScript (with a chosen framework: Next.js, Vue.js, Svelte, or Mithril). HTML, CSS.
-*   **Backend:** Go.  Caddy (suggested) or custom web server.
-*   **Database:** SQLite.
-*   **Real-time Communication:** Gorilla WebSocket.
-*   **Migrations:** golang-migrate (or similar).
-*   **UUIDs:** gofrs/uuid or google/uuid.
-*   **Image Handling:** Support for JPEG, PNG, and GIF.
+```bash
+cd backend/cmd
+go run .
+```
 
-**9. Dockerization:**
+The database is created in `backend/db/sqlite/` and all migrations run automatically.
 
-*   Separate Docker images for the frontend and backend.
-*   Proper port exposure for communication between containers.
+**Frontend** (in a second terminal)
 
-**10. Database Migrations:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-*   A structured migration system to manage database schema changes.
+Open **http://localhost:3000**.
 
+---
 
-## Project Structure (Example)
+## Database
+
+The schema is managed with versioned migrations in [`backend/db/migration/`](backend/db/migration). Each migration has an `up` and a `down` file.
+
+Main tables: `users`, `sessions`, `posts`, `post_allowed`, `comments`, `likes`, `followers`, `follow_requests`, `groups`, `group_members`, `group_invites`, `events`, `event_presence`, `chats`, `group_chat`, `notifications`.
+
+---
+
+## API overview
+
+| Area | Base route | Examples |
+|---|---|---|
+| Auth | `/api` | `POST /register`, `POST /login`, `GET /logout` |
+| Posts | `/api/posts` | `POST /createpost`, `GET /getposts`, `GET /getsinglepost` |
+| Comments | `/api/comment` | `POST /sendcomment`, `GET /getcomment` |
+| Likes | `/api/likes` | `POST /react` |
+| Users | `/api/users` | `GET /profile`, `PUT /privacy`, `POST /follow`, `POST /accept`, `POST /reject` |
+| Groups | `/api/groups` | `POST /POST`, `POST /invite`, `POST /join`, `POST /{groupId}/newEvent` |
+| Chat | `/api/websocket` | `/ws`, `GET /Get_Chat_History` |
+| Notifications | `/api/ws` | WebSocket |
+| Images | `/api/images/` | Uploaded images |
+
+---
+
+## Project structure
 
 ```
-.
-├── README.md
-├── backend
-│   ├── Dockerfile
-│   ├── LICENSE
-│   ├── README.md
-│   ├── auth
-│   │   ├── cookies.go
-│   │   ├── logic.go
-│   │   ├── login.go
-│   │   ├── logout.go
-│   │   ├── model.go
-│   │   ├── parsing.go
-│   │   ├── register.go
-│   │   ├── routes.go
-│   │   ├── send_roken.go
-│   │   ├── token.go
-│   │   └── verify_token.go
-│   ├── chat
-│   │   ├── chat_group.go
-│   │   ├── chat_personal.go
-│   │   ├── get_history.go
-│   │   ├── model.go
-│   │   ├── queries.go
-│   │   ├── routes.go
-│   │   ├── web_socket.go
-│   │   └── web_socket_listners.go
-│   ├── cmd
-│   │   └── main.go
-│   ├── comments
-│   │   ├── create_comment.go
-│   │   ├── get_comments.go
-│   │   ├── insert_comments.go
-│   │   ├── models.go
-│   │   └── routes.go
-│   ├── db
-│   │   ├── migration
-│   │   │   ├── 000001_table_users.down.sql
-│   │   │   ├── 000001_table_users.up.sql
-│   │   │   ├── 000002_table_posts.down.sql
-│   │   │   ├── 000002_table_posts.up.sql
-│   │   │   ├── 000003_table_post_allowed.down.sql
-│   │   │   ├── 000003_table_post_allowed.up.sql
-│   │   │   ├── 000004_table_sessions.down.sql
-│   │   │   ├── 000004_table_sessions.up.sql
-│   │   │   ├── 000005_table_followers.down.sql
-│   │   │   ├── 000005_table_followers.up.sql
-│   │   │   ├── 000007_follow_requests.down.sql
-│   │   │   ├── 000007_follow_requests.up.sql
-│   │   │   ├── 000008_table_likes.down.sql
-│   │   │   ├── 000008_table_likes.up.sql
-│   │   │   ├── 000009_table_follow_relationships.down.sql
-│   │   │   ├── 000009_table_follow_relationships.up.sql
-│   │   │   ├── 000010_table_groups.down.sql
-│   │   │   ├── 000010_table_groups.up.sql
-│   │   │   ├── 000011_table_group_members.down.sql
-│   │   │   ├── 000011_table_group_members.up.sql
-│   │   │   ├── 000012_table_group_invites.down.sql
-│   │   │   ├── 000012_table_group_invites.up.sql
-│   │   │   ├── 000013_table_comments.down.sql
-│   │   │   ├── 000014_table_notifications.down.sql
-│   │   │   ├── 000014_table_notifications.up.sql
-│   │   │   ├── 000015_table_chats.down.sql
-│   │   │   ├── 000015_table_chats.up.sql
-│   │   │   ├── 000016_table_group_chat.down.sql
-│   │   │   ├── 000016_table_group_chat.up.sql
-│   │   │   ├── 000017_follow_requests.down.sql
-│   │   │   ├── 000017_follow_requests.up.sql
-│   │   │   ├── 000018_table_event_presence.down.sql
-│   │   │   ├── 000018_table_event_presence.up.sql
-│   │   │   ├── 000019_table_events.down.sql
-│   │   │   └── 000019_table_events.up.sql
-│   │   └── sqlite
-│   │       ├── database.db
-│   │       └── sqlite.go
-│   ├── events
-│   │   ├── create_event.go
-│   │   ├── event_presence.go
-│   │   ├── get_events.go
-│   │   └── model.go
-│   ├── go.mod
-│   ├── go.sum
-│   ├── groups
-│   │   ├── createGroup.go
-│   │   ├── fetchGroups.go
-│   │   ├── getFriendList.go
-│   │   ├── getGroup.go
-│   │   ├── getGroupMembers.go
-│   │   ├── getInvite.go
-│   │   ├── getPendingGroupInvites.go
-│   │   ├── handleAdminApproveInvite.go
-│   │   ├── handleInvite.go
-│   │   ├── handleInviteResponse.go
-│   │   ├── handleJoin.go
-│   │   ├── models.go
-│   │   └── routes.go
-│   ├── groups_shared
-│   │   ├── get_group_memebrs.go
-│   │   └── model.go
-│   ├── likes
-│   │   ├── like_post.go
-│   │   ├── model.go
-│   │   └── routes.go
-│   ├── logs
-│   │   └── app.log
-│   ├── middleware
-│   │   ├── check_exist_user.go
-│   │   └── enable_cors.go
-│   ├── migrate
-│   ├── notifications
-│   │   ├── broad_cast_notification.go
-│   │   ├── model.go
-│   │   ├── save_notification.go
-│   │   ├── send_notification.go
-│   │   └── wsHandler.go
-│   ├── posts
-│   │   ├── create_post.go
-│   │   ├── get_post.go
-│   │   ├── insert_post.go
-│   │   ├── model.go
-│   │   ├── post_privacy.go
-│   │   ├── posts_pagination.go
-│   │   └── routes.go
-│   ├── profile
-│   │   ├── follow_requests.go
-│   │   ├── follow_toggle.go
-│   │   ├── friends_and_suggestions.go
-│   │   ├── model.go
-│   │   ├── profile_getters.go
-│   │   ├── profile_status.go
-│   │   ├── querys.go
-│   │   └── routes.go
-│   ├── profile_shared
-│   │   ├── get_user_profile.go
-│   │   └── model.go
-│   ├── shared_packages
-│   │   ├── groupValidation.go
-│   │   └── set_context.go
-│   ├── token
-│   │   ├── get_token.go
-│   │   ├── get_user_by_token.go
-│   │   └── save_token_into_db.go
-│   ├── uploads
-│   │   ├── posts
-│   │   │   ├── e586cc46-914e-49eb-af5d-39df0675d4e6.JPEG
-│   │   │   ├── f76d9d10-8dd7-4162-8d2d-c7dcd3050226.JPEG
-│   │   │   └── ...
-│   │   └── profile_image
-│   │       ├── bf0e7bf9-e5f7-4baf-ba73-a9552d6c3aaf.JPEG
-│   │       ├── c346d359-26f5-4592-8fef-063c2e7ef23e.JPEG
-│   │       └── ....
-│   └── utils
-│       ├── generate_chat_session_id.go
-│       ├── handleImgUpload.go
-│       ├── json_response.go
-│       ├── logger.go
-│       ├── rate_limit.go
-│       └── upload_image.go
-├── caddy
-│   ├── Caddyfile
-│   └── Dockerfile
+Social-Network/
 ├── docker-compose.yml
-├── frontend
-│   ├── Dockerfile
-│   ├── README.md
-│   ├── eslint.config.mjs
-│   ├── jsconfig.json
-│   ├── next.config.mjs
-│   ├── node_modules
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── public
-│   │   ├── file.svg
-│   │   ├── globe.svg
-│   │   ├── next.svg
-│   │   ├── uploads
-│   │   │   ├── background.webp
-│   │   │   ├── comment
-│   │   │   ├── groups_cover
-│   │   │   ├── posts
-│   │   │   ├── profile.jpeg
-│   │   │   └── profile_images
-│   │   ├── vercel.svg
-│   │   └── window.svg
-│   └── src
-│       ├── app
-│       │   ├── (auth)
-│       │   ├── events
-│       │   ├── favicon.ico
-│       │   ├── friends
-│       │   ├── groups
-│       │   ├── layout.js
-│       │   ├── not-found.jsx
-│       │   ├── notifications
-│       │   ├── page.js
-│       │   └── profile
-│       ├── components
-│       │   ├── Group
-│       │   ├── chat
-│       │   ├── common
-│       │   ├── events
-│       │   ├── friends
-│       │   ├── groups
-│       │   ├── layout
-│       │   ├── notifications
-│       │   ├── posts
-│       │   └── profile
-│       ├── context
-│       │   ├── fetchJson.jsx
-│       │   ├── friends_context.jsx
-│       │   ├── notifications-context.jsx
-│       │   └── user_context.jsx
-│       ├── hooks
-│       │   ├── useFetch.js
-│       │   ├── useFloatingChat.js
-│       │   └── usePosts.js
-│       ├── lib
-│       │   ├── api
-│       │   ├── mock-data.jsx
-│       │   └── websocket
-│       ├── middleware.jsx
-│       └── styles
-│           ├── GroupChat.module.css
-│           ├── UpcomingEvents.module.css
-│           ├── auth.module.css
-│           ├── chat.module.css
-│           ├── components.module.css
-│           ├── emoji-picker.module.css
-│           ├── events.module.css
-│           ├── floating-chat.module.css
-│           ├── friends.module.css
-│           ├── globals.css
-│           ├── groups.module.css
-│           ├── home.module.css
-│           ├── login.module.css
-│           ├── modal.module.css
-│           ├── navbar.module.css
-│           ├── newEvent.module.css
-│           ├── notifications.module.css
-│           ├── posts.module.css
-│           ├── profile.module.css
-│           ├── register.module.css
-│           └── sidebar.module.css
-├── go.mod
-└── test.text
-
+├── backend/
+│   ├── cmd/main.go         # Server entry point and routes
+│   ├── auth/               # Register, login, logout, sessions
+│   ├── posts/              # Posts, privacy, pagination
+│   ├── comments/
+│   ├── likes/
+│   ├── profile/            # Profiles, follow, requests, suggestions
+│   ├── groups/             # Groups, invites, join requests
+│   ├── events/             # Group events and RSVP
+│   ├── chat/               # Private and group chat (WebSocket)
+│   ├── notifications/      # Live notifications (WebSocket)
+│   ├── middleware/         # CORS, auth check
+│   ├── utils/              # Image upload, rate limit, logger
+│   └── db/
+│       ├── migration/      # SQL migrations (up / down)
+│       └── sqlite/         # Database setup
+└── frontend/
+    └── src/
+        ├── app/            # Pages: home, profile, groups, events, friends, notifications
+        ├── components/     # UI components
+        ├── context/        # User, friends, notifications state
+        ├── hooks/
+        └── lib/            # API and WebSocket clients
 ```
 
-## Author Information
+---
 
-This project was developed as part of the INTRA OUJDA module.  The original design and specifications were provided by the instructors. 
-Made With Passion by : 
-- [Omar Elhaouch](https://github.com/elhaouchomar)  
-- [Zakaria Abdlali](https://github.com/heyZakaria)  
-- [Houda Hdili](https://github.com/houdajeon)  
-- [Mohamed Tawil](https://github.com/twlmed212)
+## What we learned
 
+- Building a REST API and WebSocket server in Go
+- Real-time features: chat, group chat, and live notifications
+- Designing privacy rules for posts and profiles
+- Managing a database schema with migrations
+- Building a React app with Next.js and connecting it to a Go backend
+- Running a multi-container app with Docker Compose
+- Working as a team of 4 with Git: 269 commits across backend and frontend
 
+---
 
-## Contributing
+## Team
 
-Contributions are welcome! Please submit issues or pull requests through the appropriate channels.
-
+- **Mohamed Tawil**: [@twlmed212](https://github.com/twlmed212)
+- **Omar El Haouch**: [@elhaouchomar](https://github.com/elhaouchomar)
+- **Zakaria Abdlali**: [@heyZakaria](https://github.com/heyZakaria)
+- **Houda Hdili**: [@houdajeon](https://github.com/houdajeon)
 
 ## License
-This project is licensed under a permissive free-use license. Anyone is welcome to use, modify, and distribute this code for any purpose, provided that the original authors are credited in any derivative works or distributions. Please retain attribution to the original contributors listed above.
+
+Free to use, modify, and distribute, as long as the original authors listed above are credited.
